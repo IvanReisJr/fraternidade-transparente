@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import logoAssociacao from "@/assets/logo-associacao-transparent.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,9 +45,11 @@ export default function Login() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center p-12">
         <div className="max-w-md text-center">
           <div className="mb-8 flex justify-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-foreground/10">
-              <Building2 className="h-10 w-10 text-primary-foreground" />
-            </div>
+            <img 
+              src={logoAssociacao} 
+              alt="Logo Associação Lar São Francisco de Assis" 
+              className="h-32 w-32 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-primary-foreground mb-4">
             Sistema Fraternidade Transparente
@@ -77,9 +80,11 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8 text-center">
             <div className="mb-4 flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
-                <Building2 className="h-7 w-7 text-primary-foreground" />
-              </div>
+              <img 
+                src={logoAssociacao} 
+                alt="Logo Associação Lar São Francisco de Assis" 
+                className="h-20 w-20 object-contain"
+              />
             </div>
             <h1 className="text-xl font-bold text-foreground">
               Fraternidade Transparente
