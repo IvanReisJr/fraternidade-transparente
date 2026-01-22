@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import api from "../services/api";
+
 export default function Login() {
   const navigate = useNavigate();
   const {
@@ -15,27 +17,43 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    if (email && password) {
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Bem-vindo ao Sistema Fraternidade Transparente."
-      });
-      navigate("/dashboard");
-    } else {
-      toast({
-        title: "Erro no login",
-        description: "Por favor, preencha todos os campos.",
-        variant: "destructive"
-      });
+    try {
+        if (!email || !password) {
+             toast({
+                title: "Erro no login",
+                description: "Por favor, preencha todos os campos.",
+                variant: "destructive"
+             });
+             setIsLoading(false);
+             return;
+        }
+
+        const response = await api.post('/login', { email, password });
+        
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        toast({
+            title: "Login realizado com sucesso!",
+            description: "Bem-vindo ao Sistema Fraternidade Transparente."
+        });
+        navigate("/dashboard");
+    } catch (error) {
+        toast({
+            title: "Erro no login",
+            description: "Credenciais inválidas ou erro no servidor.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsLoading(false);
     }
-    setIsLoading(false);
   };
+
   return <div className="min-h-screen flex">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center p-12">

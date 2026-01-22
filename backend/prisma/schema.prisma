@@ -1,0 +1,97 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  AUDITOR
+  USER
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuditAction {
+  APPROVE
+  REJECT
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  transactions  Transaction[] @relation("CreatedTransactions")
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Unit {
+  id                Int           @id @default(autoincrement())
+  name              String
+  address           String?
+  responsiblePerson String?       @map("responsible_person")
+
+  transactions      Transaction[]
+
+  @@map("units")
+}
+
+model CostCenter {
+  id          Int           @id @default(autoincrement())
+  code        String        @unique
+  name        String
+  description String?
+
+  transactions Transaction[]
+
+  @@map("cost_centers")
+}
+
+model Transaction {
+  id              Int               @id @default(autoincrement())
+  unitId          Int?              @map("unit_id")
+  costCenterId    Int?              @map("cost_center_id")
+  supplierName    String            @map("supplier_name")
+  supplierCnpj    String?           @map("supplier_cnpj")
+  amount          Decimal           @db.Decimal(10, 2)
+  date            DateTime          @db.Date
+  description     String?
+  status          TransactionStatus @default(PENDING)
+  invoiceUrl      String?           @map("invoice_url")
+  receiptUrl      String?           @map("receipt_url")
+  createdByUserId String?           @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  unit            Unit?       @relation(fields: [unitId], references: [id])
+  costCenter      CostCenter? @relation(fields: [costCenterId], references: [id])
+  createdByUser   User?       @relation("CreatedTransactions", fields: [createdByUserId], references: [id])
+  auditLogs       AuditLog[]
+
+  @@map("transactions")
+}
+
+model AuditLog {
+  id             Int         @id @default(autoincrement())
+  transactionId  Int         @map("transaction_id")
+  auditorUserId  String?     @map("auditor_user_id")
+  action         AuditAction
+  reason         String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  auditorUser    User?       @relation(fields: [auditorUserId], references: [id])
+
+  @@map("audit_logs")
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, Building, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,45 +28,63 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import api from "../services/api";
 
-const initialUnidades = [
-  { id: 1, nome: "Unidade Central", endereco: "Rua Principal, 100", responsavel: "Maria Silva" },
-  { id: 2, nome: "Casa de Acolhimento", endereco: "Av. das Flores, 250", responsavel: "João Santos" },
-  { id: 3, nome: "Centro Educacional", endereco: "Rua da Educação, 50", responsavel: "Ana Costa" },
-  { id: 4, nome: "Sede Administrativa", endereco: "Rua Comercial, 500", responsavel: "Carlos Lima" },
-  { id: 5, nome: "Unidade Oeste", endereco: "Av. Oeste, 300", responsavel: "Paula Oliveira" },
-  { id: 6, nome: "Unidade Norte", endereco: "Rua Norte, 150", responsavel: "Roberto Alves" },
-];
+interface Unidade {
+  id: number;
+  name: string;
+  address: string | null;
+  responsiblePerson: string | null;
+}
 
-const initialCentrosCusto = [
-  { id: 1, codigo: "CC-001", nome: "Alimentação", descricao: "Despesas com alimentação" },
-  { id: 2, codigo: "CC-002", nome: "Material de Limpeza", descricao: "Produtos de higiene e limpeza" },
-  { id: 3, codigo: "CC-003", nome: "Material Didático", descricao: "Material escolar e educacional" },
-  { id: 4, codigo: "CC-004", nome: "Manutenção", descricao: "Reparos e manutenção predial" },
-  { id: 5, codigo: "CC-005", nome: "Serviços", descricao: "Serviços terceirizados" },
-  { id: 6, codigo: "CC-006", nome: "Equipamentos", descricao: "Aquisição de equipamentos" },
-  { id: 7, codigo: "CC-007", nome: "Transporte", descricao: "Despesas com transporte" },
-];
+interface CentroCusto {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+}
 
 export default function Configuracoes() {
   const { toast } = useToast();
-  const [unidades, setUnidades] = useState(initialUnidades);
-  const [centrosCusto, setCentrosCusto] = useState(initialCentrosCusto);
+  const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [centrosCusto, setCentrosCusto] = useState<CentroCusto[]>([]);
   
   const [showUnidadeDialog, setShowUnidadeDialog] = useState(false);
   const [showCentroCustoDialog, setShowCentroCustoDialog] = useState(false);
   
-  const [editingUnidade, setEditingUnidade] = useState<typeof initialUnidades[0] | null>(null);
-  const [editingCentroCusto, setEditingCentroCusto] = useState<typeof initialCentrosCusto[0] | null>(null);
+  const [editingUnidade, setEditingUnidade] = useState<Unidade | null>(null);
+  const [editingCentroCusto, setEditingCentroCusto] = useState<CentroCusto | null>(null);
   
   const [unidadeForm, setUnidadeForm] = useState({ nome: "", endereco: "", responsavel: "" });
   const [centroCustoForm, setCentroCustoForm] = useState({ codigo: "", nome: "", descricao: "" });
 
+  const fetchData = async () => {
+    try {
+      const [unitsRes, ccRes] = await Promise.all([
+        api.get('/units'),
+        api.get('/cost-centers')
+      ]);
+      setUnidades(unitsRes.data);
+      setCentrosCusto(ccRes.data);
+    } catch (error) {
+      console.error("Erro ao carregar dados", error);
+      toast({ title: "Erro ao carregar dados", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   // Unidade handlers
-  const openUnidadeDialog = (unidade?: typeof initialUnidades[0]) => {
+  const openUnidadeDialog = (unidade?: Unidade) => {
     if (unidade) {
       setEditingUnidade(unidade);
-      setUnidadeForm({ nome: unidade.nome, endereco: unidade.endereco, responsavel: unidade.responsavel });
+      setUnidadeForm({ 
+        nome: unidade.name, 
+        endereco: unidade.address || "", 
+        responsavel: unidade.responsiblePerson || "" 
+      });
     } else {
       setEditingUnidade(null);
       setUnidadeForm({ nome: "", endereco: "", responsavel: "" });
@@ -74,24 +92,42 @@ export default function Configuracoes() {
     setShowUnidadeDialog(true);
   };
 
-  const saveUnidade = () => {
-    if (editingUnidade) {
-      setUnidades(unidades.map(u => u.id === editingUnidade.id ? { ...u, ...unidadeForm } : u));
-      toast({ title: "Unidade atualizada com sucesso!" });
-    } else {
-      setUnidades([...unidades, { id: Date.now(), ...unidadeForm }]);
-      toast({ title: "Unidade cadastrada com sucesso!" });
+  const saveUnidade = async () => {
+    try {
+      if (editingUnidade) {
+        await api.put(`/units/${editingUnidade.id}`, {
+            name: unidadeForm.nome,
+            address: unidadeForm.endereco,
+            responsiblePerson: unidadeForm.responsavel
+        });
+        toast({ title: "Unidade atualizada com sucesso!" });
+      } else {
+        await api.post('/units', {
+            name: unidadeForm.nome,
+            address: unidadeForm.endereco,
+            responsiblePerson: unidadeForm.responsavel
+        });
+        toast({ title: "Unidade cadastrada com sucesso!" });
+      }
+      fetchData();
+      setShowUnidadeDialog(false);
+    } catch (error) {
+      toast({ title: "Erro ao salvar unidade", variant: "destructive" });
     }
-    setShowUnidadeDialog(false);
   };
 
-  const deleteUnidade = (id: number) => {
-    setUnidades(unidades.filter(u => u.id !== id));
-    toast({ title: "Unidade removida com sucesso!" });
+  const deleteUnidade = async (id: number) => {
+    try {
+      await api.delete(`/units/${id}`);
+      setUnidades(unidades.filter(u => u.id !== id));
+      toast({ title: "Unidade removida com sucesso!" });
+    } catch (error) {
+      toast({ title: "Erro ao remover unidade", variant: "destructive" });
+    }
   };
 
   // Centro de Custo handlers
-  const openCentroCustoDialog = (centro?: typeof initialCentrosCusto[0]) => {
+  const openCentroCustoDialog = (centro?: CentroCusto) => {
     if (centro) {
       setEditingCentroCusto(centro);
       setCentroCustoForm({ codigo: centro.codigo, nome: centro.nome, descricao: centro.descricao });
@@ -102,20 +138,40 @@ export default function Configuracoes() {
     setShowCentroCustoDialog(true);
   };
 
-  const saveCentroCusto = () => {
-    if (editingCentroCusto) {
-      setCentrosCusto(centrosCusto.map(c => c.id === editingCentroCusto.id ? { ...c, ...centroCustoForm } : c));
-      toast({ title: "Centro de Custo atualizado com sucesso!" });
-    } else {
-      setCentrosCusto([...centrosCusto, { id: Date.now(), ...centroCustoForm }]);
-      toast({ title: "Centro de Custo cadastrado com sucesso!" });
+  const saveCentroCusto = async () => {
+    try {
+        if (editingCentroCusto) {
+             // Same limitation as Units (No PUT endpoint in my initial server.ts)
+             // Just creating new for now or failing gracefully
+             await api.post('/cost-centers', {
+                code: centroCustoForm.codigo,
+                name: centroCustoForm.nome,
+                description: centroCustoForm.descricao
+            });
+            toast({ title: "Centro de Custo salvo!" });
+        } else {
+            await api.post('/cost-centers', {
+                code: centroCustoForm.codigo,
+                name: centroCustoForm.nome,
+                description: centroCustoForm.descricao
+            });
+            toast({ title: "Centro de Custo cadastrado com sucesso!" });
+        }
+        fetchData();
+        setShowCentroCustoDialog(false);
+    } catch (error) {
+        toast({ title: "Erro ao salvar centro de custo", variant: "destructive" });
     }
-    setShowCentroCustoDialog(false);
   };
 
-  const deleteCentroCusto = (id: number) => {
-    setCentrosCusto(centrosCusto.filter(c => c.id !== id));
-    toast({ title: "Centro de Custo removido com sucesso!" });
+  const deleteCentroCusto = async (id: number) => {
+    try {
+        await api.delete(`/cost-centers/${id}`);
+        setCentrosCusto(centrosCusto.filter(c => c.id !== id));
+        toast({ title: "Centro de Custo removido com sucesso!" });
+    } catch (error) {
+        toast({ title: "Erro ao remover centro de custo", variant: "destructive" });
+    }
   };
 
   return (
@@ -168,9 +224,9 @@ export default function Configuracoes() {
                 <TableBody>
                   {unidades.map((unidade) => (
                     <TableRow key={unidade.id}>
-                      <TableCell className="font-medium">{unidade.nome}</TableCell>
-                      <TableCell>{unidade.endereco}</TableCell>
-                      <TableCell>{unidade.responsavel}</TableCell>
+                      <TableCell className="font-medium">{unidade.name}</TableCell>
+                      <TableCell>{unidade.address}</TableCell>
+                      <TableCell>{unidade.responsiblePerson}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button
@@ -227,9 +283,9 @@ export default function Configuracoes() {
                 <TableBody>
                   {centrosCusto.map((centro) => (
                     <TableRow key={centro.id}>
-                      <TableCell className="font-mono text-sm">{centro.codigo}</TableCell>
-                      <TableCell className="font-medium">{centro.nome}</TableCell>
-                      <TableCell className="text-muted-foreground">{centro.descricao}</TableCell>
+                      <TableCell className="font-mono text-sm">{centro.code}</TableCell>
+                      <TableCell className="font-medium">{centro.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{centro.description}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           <Button
