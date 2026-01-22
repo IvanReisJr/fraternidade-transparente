@@ -4,6 +4,7 @@ import {
   FileText,
   Clock,
   CheckCircle,
+  XCircle,
   ArrowUpRight,
 } from "lucide-react";
 import {
@@ -43,7 +44,7 @@ interface Transaction {
   unit: { name: string };
   costCenter: { name: string };
   supplierName: string;
-  amount: string | number;
+  amount: string;
   date: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
 }
@@ -68,14 +69,31 @@ export default function Dashboard() {
 
   // Cálculos Estatísticos
   const totalGastos = transactions.reduce((acc, curr) => {
-    const val = typeof curr.amount === 'string' ? parseFloat(curr.amount) : curr.amount;
+    const val = typeof curr.amount === 'string' ? parseFloat(curr.amount) : Number(curr.amount);
     return acc + val;
   }, 0);
 
   const totalCount = transactions.length;
   const pendingCount = transactions.filter(t => t.status === 'PENDING').length;
   const approvedCount = transactions.filter(t => t.status === 'APPROVED').length;
-  const approvalRate = totalCount > 0 ? (approvedCount / totalCount) * 100 : 0;
+  const rejectedCount = transactions.filter(t => t.status === 'REJECTED').length;
+
+  // Cálculo por Categoria (Dinâmico)
+  const expensesByCategory = transactions.reduce((acc, curr) => {
+    const category = curr.costCenter?.name || 'Outros';
+    const amount = typeof curr.amount === 'string' ? parseFloat(curr.amount) : Number(curr.amount);
+    acc[category] = (acc[category] || 0) + amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const categoryStats = Object.entries(expensesByCategory)
+    .map(([name, value]) => ({
+      name,
+      value: totalGastos > 0 ? (value / totalGastos) * 100 : 0,
+      amount: value
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5); // Top 5
 
   // Formatação
   const formatCurrency = (value: number) =>
@@ -96,24 +114,38 @@ export default function Dashboard() {
       value: formatCurrency(totalGastos),
       icon: TrendingUp,
       colorClass: "bg-primary/10 text-primary",
+      // trend: "+2.5%", // Deixar guardado para futuro uso (comparativo mensal)
+      // trendUp: true,
     },
     {
       name: "Lançamentos",
       value: totalCount.toString(),
       icon: FileText,
       colorClass: "bg-primary/10 text-primary",
+      // trend: "+4", // Deixar guardado para futuro uso
+      // trendUp: true,
     },
     {
       name: "Pendentes",
       value: pendingCount.toString(),
       icon: Clock,
       colorClass: "bg-warning/10 text-warning",
+      // trend: "-1", // Deixar guardado para futuro uso
+      // trendUp: false,
     },
     {
-      name: "Taxa de Aprovação",
-      value: `${approvalRate.toFixed(1)}%`,
+      name: "Aprovados",
+      value: approvedCount.toString(),
       icon: CheckCircle,
       colorClass: "bg-success/10 text-success",
+      // trend: "+1.2%", // Deixar guardado para futuro uso
+      // trendUp: true,
+    },
+    {
+      name: "Glosados",
+      value: rejectedCount.toString(),
+      icon: XCircle,
+      colorClass: "bg-destructive/10 text-destructive",
     },
   ];
 
@@ -128,7 +160,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => (
           <div key={stat.name} className="stat-card">
             <div className="flex items-center justify-between">
@@ -212,20 +244,14 @@ export default function Dashboard() {
             <CardDescription>Distribuição de gastos este mês</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { name: "Alimentação", value: 35, amount: "R$ 44.957,50" },
-              { name: "Manutenção", value: 25, amount: "R$ 32.112,50" },
-              { name: "Material", value: 20, amount: "R$ 25.690,00" },
-              { name: "Serviços", value: 12, amount: "R$ 15.414,00" },
-              { name: "Outros", value: 8, amount: "R$ 10.276,00" },
-            ].map((category) => (
+            {categoryStats.map((category) => (
               <div key={category.name} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-foreground">
                     {category.name}
                   </span>
                   <span className="text-muted-foreground">
-                    {category.amount}
+                    {formatCurrency(category.amount)}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-secondary">

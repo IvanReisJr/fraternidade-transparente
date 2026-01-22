@@ -46,6 +46,11 @@ interface Transaction {
   receiptUrl: string | null;
 }
 
+interface Unit {
+  id: number;
+  name: string;
+}
+
 const statusConfig = {
   APPROVED: {
     label: "Aprovado",
@@ -66,6 +71,7 @@ export default function Lancamentos() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [unidadeFilter, setUnidadeFilter] = useState("all");
   const [lancamentos, setLancamentos] = useState<Transaction[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -76,7 +82,18 @@ export default function Lancamentos() {
             console.error("Erro ao buscar lançamentos", error);
         }
     };
+
+    const fetchUnits = async () => {
+      try {
+        const response = await api.get('/units');
+        setUnits(response.data);
+      } catch (error) {
+        console.error("Erro ao buscar unidades", error);
+      }
+    };
+
     fetchTransactions();
+    fetchUnits();
   }, []);
 
   const filteredLancamentos = lancamentos.filter((lancamento) => {
@@ -170,18 +187,11 @@ export default function Lancamentos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas Unidades</SelectItem>
-                  <SelectItem value="Unidade Central">Unidade Central</SelectItem>
-                  <SelectItem value="Casa de Acolhimento">
-                    Casa de Acolhimento
-                  </SelectItem>
-                  <SelectItem value="Centro Educacional">
-                    Centro Educacional
-                  </SelectItem>
-                  <SelectItem value="Sede Administrativa">
-                    Sede Administrativa
-                  </SelectItem>
-                  <SelectItem value="Unidade Oeste">Unidade Oeste</SelectItem>
-                  <SelectItem value="Unidade Norte">Unidade Norte</SelectItem>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.name}>
+                      {unit.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Button variant="outline" size="icon" onClick={handleExportExcel} title="Exportar para Excel">
