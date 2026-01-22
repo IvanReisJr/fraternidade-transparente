@@ -1,14 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle,
   XCircle,
   Eye,
   FileText,
-  Download,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -26,83 +24,89 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import api from "../services/api";
 
-const pendingItems = [
-  {
-    id: "LAN-002",
-    unidade: "Casa de Acolhimento",
-    categoria: "Material de Limpeza",
-    fornecedor: "Limpa Mais Ltda",
-    cnpj: "23.456.789/0001-01",
-    valor: 890.0,
-    data: "2026-01-17",
-    descricao: "Compra mensal de materiais de limpeza para a unidade.",
-  },
-  {
-    id: "LAN-005",
-    unidade: "Unidade Oeste",
-    categoria: "Manutenção",
-    fornecedor: "Manutenções Express",
-    cnpj: "56.789.012/0001-34",
-    valor: 1850.0,
-    data: "2026-01-16",
-    descricao: "Reparo emergencial no sistema elétrico.",
-  },
-  {
-    id: "LAN-008",
-    unidade: "Casa de Acolhimento",
-    categoria: "Manutenção",
-    fornecedor: "Elétrica e Cia",
-    cnpj: "89.012.345/0001-67",
-    valor: 2100.0,
-    data: "2026-01-14",
-    descricao: "Instalação de novo quadro de distribuição.",
-  },
-];
+interface Transaction {
+  id: number;
+  unit: { name: string };
+  costCenter: { name: string };
+  supplierName: string;
+  supplierCnpj: string;
+  amount: string; // Decimal comes as string from JSON usually
+  date: string;
+  description: string;
+}
 
 export default function Auditoria() {
   const { toast } = useToast();
-  const [items, setItems] = useState(pendingItems);
-  const [selectedItem, setSelectedItem] = useState<typeof pendingItems[0] | null>(
-    null
-  );
+  const [items, setItems] = useState<Transaction[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Transaction | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const formatCurrency = (value: number) => {
+  const fetchPending = async () => {
+    try {
+        const response = await api.get('/transactions?status=PENDING');
+        setItems(response.data);
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Erro ao buscar pendências", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    fetchPending();
+  }, []);
+
+  const formatCurrency = (value: number | string) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(value);
+    }).format(num);
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
-  const handleApprove = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-    toast({
-      title: "Lançamento aprovado!",
-      description: `O lançamento ${id} foi aprovado com sucesso.`,
-    });
-  };
-
-  const handleReject = () => {
-    if (selectedItem && rejectReason.trim()) {
-      setItems(items.filter((item) => item.id !== selectedItem.id));
-      toast({
-        title: "Lançamento glosado",
-        description: `O lançamento ${selectedItem.id} foi glosado.`,
-        variant: "destructive",
-      });
-      setShowRejectDialog(false);
-      setSelectedItem(null);
-      setRejectReason("");
+  const handleApprove = async (id: number) => {
+    try {
+        await api.put(`/transactions/${id}/status`, { status: 'APPROVED' });
+        setItems(items.filter((item) => item.id !== id));
+        toast({
+            title: "Lançamento aprovado!",
+            description: `O lançamento #${id} foi aprovado com sucesso.`,
+        });
+    } catch (error) {
+        toast({ title: "Erro ao aprovar", variant: "destructive" });
     }
   };
 
-  const openRejectDialog = (item: typeof pendingItems[0]) => {
+  const handleReject = async () => {
+    if (selectedItem && rejectReason.trim()) {
+      try {
+          await api.put(`/transactions/${selectedItem.id}/status`, { 
+              status: 'REJECTED',
+              reason: rejectReason
+          });
+          
+          setItems(items.filter((item) => item.id !== selectedItem.id));
+          toast({
+            title: "Lançamento glosado",
+            description: `O lançamento #${selectedItem.id} foi glosado.`,
+            variant: "destructive",
+          });
+          setShowRejectDialog(false);
+          setSelectedItem(null);
+          setRejectReason("");
+      } catch (error) {
+          toast({ title: "Erro ao glosar", variant: "destructive" });
+      }
+    }
+  };
+
+  const openRejectDialog = (item: Transaction) => {
     setSelectedItem(item);
     setShowRejectDialog(true);
   };
@@ -138,7 +142,7 @@ export default function Auditoria() {
               <CheckCircle className="h-6 w-6 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold">156</p>
+              <p className="text-2xl font-bold">-</p>
               <p className="text-sm text-muted-foreground">Aprovados este mês</p>
             </div>
           </CardContent>
@@ -149,7 +153,7 @@ export default function Auditoria() {
               <XCircle className="h-6 w-6 text-destructive" />
             </div>
             <div>
-              <p className="text-2xl font-bold">8</p>
+              <p className="text-2xl font-bold">-</p>
               <p className="text-sm text-muted-foreground">Glosados este mês</p>
             </div>
           </CardContent>
@@ -177,16 +181,16 @@ export default function Auditoria() {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <span className="font-mono text-primary">{item.id}</span>
+                      <span className="font-mono text-primary">#{item.id}</span>
                       <span className="text-muted-foreground">•</span>
-                      <span>{item.unidade}</span>
+                      <span>{item.unit?.name}</span>
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      {item.categoria} • {formatDate(item.data)}
+                      {item.costCenter?.name} • {formatDate(item.date)}
                     </CardDescription>
                   </div>
                   <p className="text-xl font-bold text-foreground">
-                    {formatCurrency(item.valor)}
+                    {formatCurrency(item.amount)}
                   </p>
                 </div>
               </CardHeader>
@@ -196,16 +200,16 @@ export default function Auditoria() {
                     <p className="text-sm font-medium text-muted-foreground">
                       Fornecedor
                     </p>
-                    <p className="font-medium">{item.fornecedor}</p>
+                    <p className="font-medium">{item.supplierName}</p>
                     <p className="text-sm text-muted-foreground font-mono">
-                      {item.cnpj}
+                      {item.supplierCnpj}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
                       Descrição
                     </p>
-                    <p className="text-sm">{item.descricao}</p>
+                    <p className="text-sm">{item.description}</p>
                   </div>
                 </div>
 
@@ -252,7 +256,7 @@ export default function Auditoria() {
           <DialogHeader>
             <DialogTitle>Glosar Lançamento</DialogTitle>
             <DialogDescription>
-              Informe o motivo da glosa para o lançamento {selectedItem?.id}.
+              Informe o motivo da glosa para o lançamento #{selectedItem?.id}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
