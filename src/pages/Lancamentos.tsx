@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, Download, Eye, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,100 +30,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import * as XLSX from "xlsx";
+import api from "../services/api";
 
-const lancamentos = [
-  {
-    id: "LAN-001",
-    unidade: "Unidade Central",
-    categoria: "Alimentação",
-    fornecedor: "Distribuidora ABC",
-    cnpj: "12.345.678/0001-90",
-    valor: 2450.0,
-    data: "2026-01-18",
-    status: "approved",
-  },
-  {
-    id: "LAN-002",
-    unidade: "Casa de Acolhimento",
-    categoria: "Material de Limpeza",
-    fornecedor: "Limpa Mais Ltda",
-    cnpj: "23.456.789/0001-01",
-    valor: 890.0,
-    data: "2026-01-17",
-    status: "pending",
-  },
-  {
-    id: "LAN-003",
-    unidade: "Centro Educacional",
-    categoria: "Material Didático",
-    fornecedor: "Papelaria Escolar",
-    cnpj: "34.567.890/0001-12",
-    valor: 1200.0,
-    data: "2026-01-17",
-    status: "approved",
-  },
-  {
-    id: "LAN-004",
-    unidade: "Sede Administrativa",
-    categoria: "Serviços",
-    fornecedor: "TechService",
-    cnpj: "45.678.901/0001-23",
-    valor: 3500.0,
-    data: "2026-01-16",
-    status: "rejected",
-  },
-  {
-    id: "LAN-005",
-    unidade: "Unidade Oeste",
-    categoria: "Manutenção",
-    fornecedor: "Manutenções Express",
-    cnpj: "56.789.012/0001-34",
-    valor: 1850.0,
-    data: "2026-01-16",
-    status: "pending",
-  },
-  {
-    id: "LAN-006",
-    unidade: "Unidade Norte",
-    categoria: "Alimentação",
-    fornecedor: "Atacadão do Norte",
-    cnpj: "67.890.123/0001-45",
-    valor: 4200.0,
-    data: "2026-01-15",
-    status: "approved",
-  },
-  {
-    id: "LAN-007",
-    unidade: "Centro Educacional",
-    categoria: "Serviços",
-    fornecedor: "Gráfica Rápida",
-    cnpj: "78.901.234/0001-56",
-    valor: 650.0,
-    data: "2026-01-15",
-    status: "approved",
-  },
-  {
-    id: "LAN-008",
-    unidade: "Casa de Acolhimento",
-    categoria: "Manutenção",
-    fornecedor: "Elétrica e Cia",
-    cnpj: "89.012.345/0001-67",
-    valor: 2100.0,
-    data: "2026-01-14",
-    status: "pending",
-  },
-];
+interface Transaction {
+  id: number;
+  unit: { name: string };
+  costCenter: { name: string };
+  supplierName: string;
+  supplierCnpj: string;
+  amount: string;
+  date: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  invoiceUrl: string | null;
+  receiptUrl: string | null;
+}
 
 const statusConfig = {
-  approved: {
+  APPROVED: {
     label: "Aprovado",
     className: "status-badge status-approved",
   },
-  pending: {
+  PENDING: {
     label: "Pendente",
     className: "status-badge status-pending",
   },
-  rejected: {
+  REJECTED: {
     label: "Glosado",
     className: "status-badge status-rejected",
   },
@@ -133,31 +65,63 @@ export default function Lancamentos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [unidadeFilter, setUnidadeFilter] = useState("all");
+  const [lancamentos, setLancamentos] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+        try {
+            const response = await api.get('/transactions');
+            setLancamentos(response.data);
+        } catch (error) {
+            console.error("Erro ao buscar lançamentos", error);
+        }
+    };
+    fetchTransactions();
+  }, []);
 
   const filteredLancamentos = lancamentos.filter((lancamento) => {
     const matchesSearch =
-      lancamento.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lancamento.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lancamento.cnpj.includes(searchTerm);
+      lancamento.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(lancamento.id).includes(searchTerm) ||
+      (lancamento.supplierCnpj && lancamento.supplierCnpj.includes(searchTerm));
 
     const matchesStatus =
       statusFilter === "all" || lancamento.status === statusFilter;
 
     const matchesUnidade =
-      unidadeFilter === "all" || lancamento.unidade === unidadeFilter;
+      unidadeFilter === "all" || (lancamento.unit && lancamento.unit.name === unidadeFilter);
 
     return matchesSearch && matchesStatus && matchesUnidade;
   });
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(value);
+    }).format(numValue);
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR");
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredLancamentos.map((item) => ({
+      ID: item.id,
+      Unidade: item.unit?.name || "N/A",
+      Categoria: item.costCenter?.name || "N/A",
+      Fornecedor: item.supplierName,
+      CNPJ: item.supplierCnpj,
+      Valor: typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount,
+      Data: formatDate(item.date),
+      Status: statusConfig[item.status]?.label || item.status,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Lançamentos");
+    XLSX.writeFile(workbook, "lancamentos_fraternidade.xlsx");
   };
 
   return (
@@ -195,9 +159,9 @@ export default function Lancamentos() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="approved">Aprovados</SelectItem>
-                  <SelectItem value="pending">Pendentes</SelectItem>
-                  <SelectItem value="rejected">Glosados</SelectItem>
+                  <SelectItem value="APPROVED">Aprovados</SelectItem>
+                  <SelectItem value="PENDING">Pendentes</SelectItem>
+                  <SelectItem value="REJECTED">Glosados</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
@@ -220,7 +184,7 @@ export default function Lancamentos() {
                   <SelectItem value="Unidade Norte">Unidade Norte</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={handleExportExcel} title="Exportar para Excel">
                 <Download className="h-4 w-4" />
               </Button>
             </div>
@@ -251,27 +215,25 @@ export default function Lancamentos() {
                   {lancamento.id}
                 </TableCell>
                 <TableCell className="font-medium">
-                  {lancamento.unidade}
+                  {lancamento.unit?.name || 'N/A'}
                 </TableCell>
-                <TableCell>{lancamento.categoria}</TableCell>
-                <TableCell>{lancamento.fornecedor}</TableCell>
+                <TableCell>{lancamento.costCenter?.name || 'N/A'}</TableCell>
+                <TableCell>{lancamento.supplierName}</TableCell>
                 <TableCell className="font-mono text-sm">
-                  {lancamento.cnpj}
+                  {lancamento.supplierCnpj}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(lancamento.valor)}
+                  {formatCurrency(lancamento.amount)}
                 </TableCell>
-                <TableCell>{formatDate(lancamento.data)}</TableCell>
+                <TableCell>{formatDate(lancamento.date)}</TableCell>
                 <TableCell>
                   <span
                     className={
-                      statusConfig[lancamento.status as keyof typeof statusConfig]
-                        .className
+                      statusConfig[lancamento.status]?.className || ""
                     }
                   >
                     {
-                      statusConfig[lancamento.status as keyof typeof statusConfig]
-                        .label
+                      statusConfig[lancamento.status]?.label || lancamento.status
                     }
                   </span>
                 </TableCell>
@@ -283,13 +245,13 @@ export default function Lancamentos() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => lancamento.invoiceUrl && window.open(lancamento.invoiceUrl, '_blank')} disabled={!lancamento.invoiceUrl}>
                         <Eye className="mr-2 h-4 w-4" />
-                        Ver detalhes
+                        Ver Nota Fiscal
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => lancamento.receiptUrl && window.open(lancamento.receiptUrl, '_blank')} disabled={!lancamento.receiptUrl}>
                         <Download className="mr-2 h-4 w-4" />
-                        Baixar documentos
+                        Ver Comprovante
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

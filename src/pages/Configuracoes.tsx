@@ -130,7 +130,11 @@ export default function Configuracoes() {
   const openCentroCustoDialog = (centro?: CentroCusto) => {
     if (centro) {
       setEditingCentroCusto(centro);
-      setCentroCustoForm({ codigo: centro.codigo, nome: centro.nome, descricao: centro.descricao });
+      setCentroCustoForm({ 
+        codigo: centro.code, 
+        nome: centro.name, 
+        descricao: centro.description || "" 
+      });
     } else {
       setEditingCentroCusto(null);
       setCentroCustoForm({ codigo: "", nome: "", descricao: "" });
@@ -141,14 +145,12 @@ export default function Configuracoes() {
   const saveCentroCusto = async () => {
     try {
         if (editingCentroCusto) {
-             // Same limitation as Units (No PUT endpoint in my initial server.ts)
-             // Just creating new for now or failing gracefully
-             await api.post('/cost-centers', {
+            await api.put(`/cost-centers/${editingCentroCusto.id}`, {
                 code: centroCustoForm.codigo,
                 name: centroCustoForm.nome,
                 description: centroCustoForm.descricao
             });
-            toast({ title: "Centro de Custo salvo!" });
+            toast({ title: "Centro de Custo atualizado com sucesso!" });
         } else {
             await api.post('/cost-centers', {
                 code: centroCustoForm.codigo,

@@ -1,10 +1,9 @@
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
-  TrendingDown,
   FileText,
   Clock,
   CheckCircle,
-  XCircle,
   ArrowUpRight,
 } from "lucide-react";
 import {
@@ -22,97 +21,102 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const stats = [
-  {
-    name: "Total de Gastos",
-    value: "R$ 128.450,00",
-    change: "+12.5%",
-    trend: "up",
-    icon: TrendingUp,
-  },
-  {
-    name: "Lançamentos",
-    value: "248",
-    change: "+8",
-    trend: "up",
-    icon: FileText,
-  },
-  {
-    name: "Pendentes",
-    value: "15",
-    change: "-3",
-    trend: "down",
-    icon: Clock,
-  },
-  {
-    name: "Taxa de Aprovação",
-    value: "94%",
-    change: "+2%",
-    trend: "up",
-    icon: CheckCircle,
-  },
-];
-
-const recentLancamentos = [
-  {
-    id: "001",
-    unidade: "Unidade Central",
-    categoria: "Alimentação",
-    valor: "R$ 2.450,00",
-    data: "18/01/2026",
-    status: "approved",
-  },
-  {
-    id: "002",
-    unidade: "Casa de Acolhimento",
-    categoria: "Material de Limpeza",
-    valor: "R$ 890,00",
-    data: "17/01/2026",
-    status: "pending",
-  },
-  {
-    id: "003",
-    unidade: "Centro Educacional",
-    categoria: "Material Didático",
-    valor: "R$ 1.200,00",
-    data: "17/01/2026",
-    status: "approved",
-  },
-  {
-    id: "004",
-    unidade: "Sede Administrativa",
-    categoria: "Serviços",
-    valor: "R$ 3.500,00",
-    data: "16/01/2026",
-    status: "rejected",
-  },
-  {
-    id: "005",
-    unidade: "Unidade Oeste",
-    categoria: "Manutenção",
-    valor: "R$ 1.850,00",
-    data: "16/01/2026",
-    status: "pending",
-  },
-];
+import api from "../services/api";
 
 const statusConfig = {
-  approved: {
+  APPROVED: {
     label: "Aprovado",
     className: "status-badge status-approved",
   },
-  pending: {
+  PENDING: {
     label: "Pendente",
     className: "status-badge status-pending",
   },
-  rejected: {
+  REJECTED: {
     label: "Glosado",
     className: "status-badge status-rejected",
   },
 };
 
+interface Transaction {
+  id: number;
+  unit: { name: string };
+  costCenter: { name: string };
+  supplierName: string;
+  amount: string | number;
+  date: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+}
+
 export default function Dashboard() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await api.get("/transactions");
+        setTransactions(response.data);
+      } catch (error) {
+        console.error("Erro ao carregar dashboard", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Cálculos Estatísticos
+  const totalGastos = transactions.reduce((acc, curr) => {
+    const val = typeof curr.amount === 'string' ? parseFloat(curr.amount) : curr.amount;
+    return acc + val;
+  }, 0);
+
+  const totalCount = transactions.length;
+  const pendingCount = transactions.filter(t => t.status === 'PENDING').length;
+  const approvedCount = transactions.filter(t => t.status === 'APPROVED').length;
+  const approvalRate = totalCount > 0 ? (approvedCount / totalCount) * 100 : 0;
+
+  // Formatação
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("pt-BR");
+
+  // Dados para a Tabela (Top 5 Recentes)
+  const recentTransactions = [...transactions]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
+  // Configuração dos Cards
+  const stats = [
+    {
+      name: "Total de Gastos",
+      value: formatCurrency(totalGastos),
+      icon: TrendingUp,
+      colorClass: "bg-primary/10 text-primary",
+    },
+    {
+      name: "Lançamentos",
+      value: totalCount.toString(),
+      icon: FileText,
+      colorClass: "bg-primary/10 text-primary",
+    },
+    {
+      name: "Pendentes",
+      value: pendingCount.toString(),
+      icon: Clock,
+      colorClass: "bg-warning/10 text-warning",
+    },
+    {
+      name: "Taxa de Aprovação",
+      value: `${approvalRate.toFixed(1)}%`,
+      icon: CheckCircle,
+      colorClass: "bg-success/10 text-success",
+    },
+  ];
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -128,30 +132,14 @@ export default function Dashboard() {
         {stats.map((stat) => (
           <div key={stat.name} className="stat-card">
             <div className="flex items-center justify-between">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                  stat.trend === "up"
-                    ? "bg-success/10 text-success"
-                    : "bg-primary/10 text-primary"
-                }`}
-              >
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.colorClass}`}>
                 <stat.icon className="h-5 w-5" />
               </div>
-              <span
-                className={`flex items-center gap-1 text-sm font-medium ${
-                  stat.trend === "up" ? "text-success" : "text-primary"
-                }`}
-              >
-                {stat.change}
-                {stat.trend === "up" ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )}
-              </span>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {loading ? "..." : stat.value}
+              </p>
               <p className="text-sm text-muted-foreground">{stat.name}</p>
             </div>
           </div>
@@ -189,24 +177,24 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentLancamentos.map((lancamento) => (
+                {recentTransactions.map((lancamento) => (
                   <TableRow key={lancamento.id}>
                     <TableCell className="font-medium">
-                      {lancamento.unidade}
+                      {lancamento.unit?.name || "N/A"}
                     </TableCell>
-                    <TableCell>{lancamento.categoria}</TableCell>
-                    <TableCell>{lancamento.valor}</TableCell>
-                    <TableCell>{lancamento.data}</TableCell>
+                    <TableCell>{lancamento.costCenter?.name || "N/A"}</TableCell>
+                    <TableCell>
+                      {formatCurrency(typeof lancamento.amount === 'string' ? parseFloat(lancamento.amount) : lancamento.amount)}
+                    </TableCell>
+                    <TableCell>{formatDate(lancamento.date)}</TableCell>
                     <TableCell>
                       <span
                         className={
-                          statusConfig[lancamento.status as keyof typeof statusConfig]
-                            .className
+                          statusConfig[lancamento.status]?.className || ""
                         }
                       >
                         {
-                          statusConfig[lancamento.status as keyof typeof statusConfig]
-                            .label
+                          statusConfig[lancamento.status]?.label || lancamento.status
                         }
                       </span>
                     </TableCell>
@@ -253,14 +241,14 @@ export default function Dashboard() {
       </div>
 
       {/* Alerts */}
-      <Card className="border-warning/30 bg-warning/5">
+      {pendingCount > 0 && <Card className="border-warning/30 bg-warning/5">
         <CardContent className="flex items-center gap-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/20">
             <Clock className="h-5 w-5 text-warning" />
           </div>
           <div className="flex-1">
             <p className="font-medium text-foreground">
-              15 lançamentos aguardando aprovação
+              {pendingCount} lançamentos aguardando aprovação
             </p>
             <p className="text-sm text-muted-foreground">
               Verifique a seção de Auditoria para revisar os lançamentos
@@ -274,7 +262,7 @@ export default function Dashboard() {
             Revisar
           </a>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

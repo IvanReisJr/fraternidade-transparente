@@ -35,6 +35,8 @@ interface Transaction {
   amount: string; // Decimal comes as string from JSON usually
   date: string;
   description: string;
+  invoiceUrl: string | null;
+  receiptUrl: string | null;
 }
 
 export default function Auditoria() {
@@ -215,11 +217,21 @@ export default function Auditoria() {
 
                 <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => item.invoiceUrl && window.open(item.invoiceUrl, '_blank')}
+                        disabled={!item.invoiceUrl}
+                    >
                       <Eye className="mr-2 h-4 w-4" />
                       Ver Nota Fiscal
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => item.receiptUrl && window.open(item.receiptUrl, '_blank')}
+                        disabled={!item.receiptUrl}
+                    >
                       <FileText className="mr-2 h-4 w-4" />
                       Ver Comprovante
                     </Button>

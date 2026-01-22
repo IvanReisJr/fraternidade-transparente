@@ -4,6 +4,8 @@ import { PrismaClient, TransactionStatus } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import path from 'path';
 
 dotenv.config();
 
@@ -12,8 +14,25 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
+// Configuração do Multer para Uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // Middleware de Autenticação
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -70,12 +89,34 @@ app.get('/transactions', authenticateToken, async (req: any, res) => {
     }
 });
 
-app.post('/transactions', authenticateToken, async (req: any, res) => {
+app.post('/transactions', authenticateToken, upload.fields([{ name: 'invoice', maxCount: 1 }, { name: 'receipt', maxCount: 1 }]), async (req: any, res) => {
     try {
-        const data = req.body;
+        const { unitId, costCenterId, amount, date, supplierName, supplierCnpj, description } = req.body;
+        
+        // Converter campos que vêm como string no multipart/form-data
+        const parsedUnitId = Number(unitId);
+        const parsedCostCenterId = Number(costCenterId);
+        const parsedAmount = parseFloat(amount);
+        const parsedDate = new Date(date);
+
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        
+        // Construir URLs completas para os arquivos
+        const baseUrl = `http://localhost:${PORT}/uploads/`;
+        const invoiceUrl = files['invoice'] ? baseUrl + files['invoice'][0].filename : null;
+        const receiptUrl = files['receipt'] ? baseUrl + files['receipt'][0].filename : null;
+
         const transaction = await prisma.transaction.create({
             data: {
-                ...data,
+                unitId: parsedUnitId,
+                costCenterId: parsedCostCenterId,
+                amount: parsedAmount,
+                date: parsedDate,
+                supplierName,
+                supplierCnpj,
+                description,
+                invoiceUrl,
+                receiptUrl,
                 createdByUserId: req.user.userId,
                 status: 'PENDING'
             }
