@@ -1,73 +1,80 @@
-# Welcome to your Lovable project
+# Sistema Fraternidade Transparente
 
-## Project info
+Sistema de Gestão Financeira e Auditoria para a Associação Lar São Francisco de Assis.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Como Rodar o Projeto
 
-## How can I edit this code?
+Este projeto consiste em um Backend (API) e um Frontend (Interface). Ambos precisam estar rodando simultaneamente.
 
-There are several ways of editing your application.
+### Pré-requisitos
+- **Node.js** (v18 ou superior)
+- **PostgreSQL** (Rodando localmente)
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 1️⃣ Configurando o Backend (API)
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Abra um terminal e entre na pasta `backend`:
+   ```bash
+   cd backend
+   ```
 
-**Use your preferred IDE**
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+3. Configure o Banco de Dados:
+   - Certifique-se de que o PostgreSQL está rodando.
+   - O arquivo `.env` já está configurado para conectar em `localhost:5432` com usuário `postgres` e senha `admin`. Ajuste se necessário.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+4. Crie as tabelas e popule o banco (apenas na primeira vez):
+   ```bash
+   npx prisma migrate dev --name init
+   npm run seed
+   ```
 
-Follow these steps:
+5. Inicie o servidor:
+   ```bash
+   npm run dev
+   ```
+   ✅ Você verá: `Server running on http://localhost:3000`
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2️⃣ Rodando o Frontend (Interface)
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. Abra um **novo terminal** na raiz do projeto (fora da pasta backend).
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
 
-**Edit a file directly in GitHub**
+3. Inicie o projeto:
+   ```bash
+   npm run dev
+   ```
+   ✅ Você verá: `Local: http://localhost:8080/`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+### 🔑 Acesso ao Sistema
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Abra seu navegador em **http://localhost:8080**
 
-## What technologies are used for this project?
+**Credenciais de Administrador:**
+- **Email:** `admin@fraternidade.org`
+- **Senha:** `admin123`
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📚 Documentação Técnica
 
-## How can I deploy this project?
+Para detalhes completos sobre a arquitetura, tecnologias e manutenção, consulte o arquivo:
+👉 [DOCUMENTACAO_MIGRACAO.md](./DOCUMENTACAO_MIGRACAO.md)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## ✅ Checklist de QA
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Para validar as funcionalidades do sistema, siga o roteiro de testes:
+👉 [CHECKLIST_QA.md](./CHECKLIST_QA.md)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload, X, FileText, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,37 +20,41 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import api from "../services/api";
 
-const unidades = [
-  "Unidade Central",
-  "Casa de Acolhimento",
-  "Centro Educacional",
-  "Sede Administrativa",
-  "Unidade Oeste",
-  "Unidade Norte",
-];
-
-const categorias = [
-  "Alimentação",
-  "Material de Limpeza",
-  "Material Didático",
-  "Manutenção",
-  "Serviços",
-  "Equipamentos",
-  "Transporte",
-  "Outros",
-];
-
-interface FileUpload {
+interface Unit {
+  id: number;
   name: string;
-  size: number;
-  type: string;
+}
+
+interface CostCenter {
+  id: number;
+  name: string;
 }
 
 export default function NovoLancamento() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [unitsRes, ccRes] = await Promise.all([
+          api.get('/units'),
+          api.get('/cost-centers')
+        ]);
+        setUnits(unitsRes.data);
+        setCostCenters(ccRes.data);
+      } catch (error) {
+        console.error("Erro ao carregar dados", error);
+        toast({ title: "Erro ao carregar opções", variant: "destructive" });
+      }
+    };
+    fetchData();
+  }, [toast]);
 
   const [formData, setFormData] = useState({
     unidade: "",
@@ -62,8 +66,8 @@ export default function NovoLancamento() {
     descricao: "",
   });
 
-  const [notaFiscal, setNotaFiscal] = useState<FileUpload | null>(null);
-  const [comprovante, setComprovante] = useState<FileUpload | null>(null);
+  const [notaFiscal, setNotaFiscal] = useState<File | null>(null);
+  const [comprovante, setComprovante] = useState<File | null>(null);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -112,15 +116,20 @@ export default function NovoLancamento() {
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const fileData: FileUpload = {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      };
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: "O tamanho máximo permitido é 10MB.",
+          variant: "destructive",
+        });
+        e.target.value = ""; // Limpa o input
+        return;
+      }
+
       if (type === "nota") {
-        setNotaFiscal(fileData);
+        setNotaFiscal(file);
       } else {
-        setComprovante(fileData);
+        setComprovante(file);
       }
     }
   };
@@ -143,15 +152,39 @@ export default function NovoLancamento() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('unitId', formData.unidade);
+      formDataToSend.append('costCenterId', formData.categoria);
+      formDataToSend.append('amount', formData.valor.replace(/\./g, '').replace(',', '.'));
+      formDataToSend.append('date', new Date(formData.data).toISOString());
+      formDataToSend.append('supplierName', formData.fornecedor);
+      formDataToSend.append('supplierCnpj', formData.cnpj);
+      formDataToSend.append('description', formData.descricao);
+      
+      if (notaFiscal) formDataToSend.append('invoice', notaFiscal);
+      if (comprovante) formDataToSend.append('receipt', comprovante);
 
-    toast({
-      title: "Lançamento enviado com sucesso!",
-      description: "O lançamento foi registrado e aguarda aprovação.",
-    });
+      await api.post('/transactions', formDataToSend, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
-    navigate("/lancamentos");
+      toast({
+        title: "Lançamento enviado com sucesso!",
+        description: "O lançamento foi registrado e aguarda aprovação.",
+      });
+
+      navigate("/lancamentos");
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Erro ao enviar lançamento",
+        description: "Verifique os dados e tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -184,9 +217,9 @@ export default function NovoLancamento() {
                   <SelectValue placeholder="Selecione a unidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {unidades.map((unidade) => (
-                    <SelectItem key={unidade} value={unidade}>
-                      {unidade}
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={String(unit.id)}>
+                      {unit.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -203,9 +236,9 @@ export default function NovoLancamento() {
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categorias.map((categoria) => (
-                    <SelectItem key={categoria} value={categoria}>
-                      {categoria}
+                  {costCenters.map((cc) => (
+                    <SelectItem key={cc.id} value={String(cc.id)}>
+                      {cc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
